@@ -17,16 +17,3 @@ Node* createInternalNode(Node* left, Node* right){
     node -> right = right;
     return node;
 }
-
-Node* extractMin(Node** nodes, int* count){
-    if (*count == 0) return NULL;
-
-    Node* min = nodes[0];
-
-    for (int i = 0; i <*count - 1; i++){
-        nodes[i] = nodes[i+1];
-    }
-
-    (*count)--;
-    return min;
-}

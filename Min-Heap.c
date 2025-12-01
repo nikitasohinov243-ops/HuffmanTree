@@ -38,6 +38,12 @@ void buildMinHeap(Node** nodes, int count){
     }
 }
 
+void insertToHeap(Node** nodes, int* count, Node* newNode) {
+    nodes[*count] = newNode;
+    (*count)++;
+    buildMinHeap(nodes, *count); // Пересортируем
+}
+
 Node* extractMin(Node** nodes, int* count){
     if (*count == 0) return NULL;
 
@@ -47,21 +53,6 @@ Node* extractMin(Node** nodes, int* count){
         nodes[i] = nodes[i+1];
     }
 
-    (*count)--;
+    (*count)--;//вычитаю т.к. взял два листа(как бы вычитаю из общего количества) и потом в tree.c добавлю (nodeCount++) узел новообразовавшийся 
     return min;
-}
-
-void insertToHeap(Node** nodes, int* count, Node* newNode){
-    nodes[*count] = newNode;
-    (*count)++;
-
-    for (int i = 0; i < *count-1; i++){
-        for (int j = i + 1; j < *count; j++){
-            if (nodes[j]->freq < nodes[i]->freq){
-                Node* temp = nodes[i];
-                nodes[i] = nodes[j];
-                nodes[j] = temp;
-            }
-        }
-    }
 }

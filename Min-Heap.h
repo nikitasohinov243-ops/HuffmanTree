@@ -7,3 +7,4 @@ void buildMinHeap(Node**, int);
 Node* extractMin(Node**, int*);
 
 void insertToHeap(Node**, int*, Node*);
+
