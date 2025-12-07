@@ -29,11 +29,6 @@ void freeTree(Node* root) {
     free(root);
 }
 
-// Декодирование файла (заглушка - требует сохранения дерева)
-void decodeFile(FILE* input, FILE* output, Node* root) {
-    printf("Decoding requires saving the tree to a file!\n");
-}
-
 // Функция сравнения двух файлов
 int compareFiles(FILE *file1, FILE *file2) {
     int char1, char2;

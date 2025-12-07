@@ -1,4 +1,4 @@
-#include "Min-Heap.h"
+#include "codeproc.h"
 
 //считаю уникальные символы
 Node** createNodeArray(unsigned int* freq, int* count){

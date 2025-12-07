@@ -1,12 +1,16 @@
 #include "codeproc.h"
-#include "Min-Heap.h"
 #include <string.h>
+
+// /Users/nikitasohinov/Documents/ВШЭ/Лабы/programirovanie.2/labs/HuffmanTree
+// ./huffman -e input.txt output.bin codes.txt
+// ./huffman -d 
+// gcc -o huffman tree.c node_leaf.c min-heap.c freq.c codes.c bit_work.c
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
-        printf("Wrong arguments! Usage:\n");
-        printf("  Encode: %s -e input.txt output.huff codes.txt\n", argv[0]);
-        printf("  Decode: %s -d input.huff output.txt codes.txt\n", argv[0]);
+        printf("Usage:\n");
+        printf("  Encode: %s -e input.txt output.bin codes.txt\n", argv[0]);
+        printf("  Decode: %s -d input.bin output.txt codes.txt\n", argv[0]);
         return 1;
     }
 
@@ -16,204 +20,139 @@ int main(int argc, char *argv[]) {
     char* codes_filename = argv[4];
 
     if (strcmp(mode, "-e") == 0) {
-        // РЕЖИМ КОДИРОВАНИЯ
-        FILE *input_file = fopen(input_filename, "r");
-        FILE *output_file = fopen(output_filename, "w");  // Только 0 и 1
-        FILE *codes_file = fopen(codes_filename, "w");      // Таблица кодов
+        // ========== КОДИРОВАНИЕ ==========
+        FILE *input_file = fopen(input_filename, "rb");
+        FILE *output_file = fopen(output_filename, "wb");
+        FILE *codes_file = fopen(codes_filename, "w");
         
-        if (!input_file) {
-            printf("Error: Cannot open input file: %s\n", input_filename);
-            return 1;
-        }
-        if (!output_file) {
-            printf("Error: Cannot open output file: %s\n", output_filename);
-            fclose(input_file);
-            return 1;
-        }
-        if (!codes_file) {
-            printf("Error: Cannot open codes file: %s\n", codes_filename);
-            fclose(input_file);
-            fclose(output_file);
+        if (!input_file || !output_file || !codes_file) {
+            printf("Error opening files\n");
             return 1;
         }
 
-        // Подсчет частот
-        unsigned int freq[256];
+        printf("=== ENCODING ===\n");
+        
+        // 1. Подсчет частот
+        unsigned int freq[256] = {0};
         countFrequencies(input_file, freq);
-
-        // Построение дерева Хаффмана
+        
+        // 2. Создание узлов
         int nodeCount;
         Node** nodes = createNodeArray(freq, &nodeCount);
+        printf("Tree built. Unique symbols: %d\n", nodeCount);
         buildMinHeap(nodes, nodeCount);
-
+        
+        // 3. Построение дерева
         while (nodeCount > 1) {
             Node* left = extractMin(nodes, &nodeCount);
             Node* right = extractMin(nodes, &nodeCount);
             Node* parent = createInternalNode(left, right);
-            
-            // Вставка нового узла
+
             nodes[nodeCount] = parent;
             nodeCount++;
             buildMinHeap(nodes, nodeCount);
         }
-
-        Node* root = nodes[0];
-        printf("Tree built! Root frequency: %d\n", root->freq);
         
-        // ГЕНЕРИРУЮ КОД
+        Node* root = nodes[0];
+        
+        // 4. Генерация кодов
         char codes[256][256] = {0};
         char currentCode[256] = {0};
         generateCodes(root, currentCode, 0, codes);
-
-        // Вывод сгенерированных кодов для отладки
-        printf("\n=== Generated Codes ===\n");
+        
+        // 5. Сохранение кодов в файл
         for (int i = 0; i < 256; i++) {
             if (strlen(codes[i]) > 0) {
-                if (i >= 32 && i <= 126) { // Печатаю символы
-                    printf("'%c' (ASCII %3d): %s\n", i, i, codes[i]);
-                } else {
-                    printf("ASCII %3d: %s\n", i, codes[i]);
-                }
+                fprintf(codes_file, "%d:%s\n", i, codes[i]);
             }
         }
-        printf("\n");
-
-        printf("Saving codes to: %s\n", codes_filename);
-        for (int i = 0; i < 256; i++) {
-            if (strlen(codes[i]) > 0) {
-                fprintf(codes_file, "%c:%s\n", i, codes[i]);
-            }
-        }
-
-        // Кодирование данных
-        rewind(input_file);
-        int ch;
-        while ((ch = fgetc(input_file)) != EOF) {
-            if (ch >= 0 && ch <= 255) {
-                // Просто записываем код как текст
-                fprintf(output_file, "%s", codes[ch]);
-            }
-        }
-
+        
+        // 6. Кодирование с побитовой арифметикой
+        encodeFileBit(input_file, output_file, codes);
+        
         // Статистика
-        printf("The file is encrypted!\n");
-        printf("Source file: %s\n", input_filename);
-        printf("Encoded file: %s\n", output_filename);
-
-        // Закрытие файлов и очистка
+        fseek(input_file, 0, SEEK_END);//разместил в конце файла
+        long inputSize = ftell(input_file);//вернул позицию каретки = размер файла
+        fseek(output_file, 0, SEEK_END);
+        long outputSize = ftell(output_file);//аналогично
+        
+        printf("Input size:  %ld bytes\n", inputSize);
+        printf("Output size: %ld bytes\n", outputSize);
+        printf("Compression: %.1f%%\n", (1.0 - (double)outputSize/inputSize) * 100);
+        
+        // Очистка
         fclose(input_file);
         fclose(output_file);
         fclose(codes_file);
         freeTree(root);
         free(nodes);
-
+        
     } else if (strcmp(mode, "-d") == 0) {
-        // РЕЖИМ ДЕКОДИРОВАНИЯ
-        char* encoded_filename = argv[2];  // "output.huff" (0 и 1)
-        char* codes_filename = argv[3];    // "codes.txt" (таблица кодов)
-        char* output_filename = argv[4];   // "decoded.txt" (результат)
-
-        FILE *encoded_file = fopen(encoded_filename, "r");  // 0 и 1
-        FILE *codes_file = fopen(codes_filename, "r");      // таблица кодов
-        FILE *output_file = fopen(output_filename, "w");
-
-        if (!encoded_file) {
-            printf("Error: Cannot open encoded file: %s\n", encoded_filename);
+        // ========== ДЕКОДИРОВАНИЕ ==========
+        FILE *input_file = fopen(input_filename, "rb");
+        FILE *output_file = fopen(output_filename, "wb");
+        FILE *codes_file = fopen(codes_filename, "r");
+        
+        if (!input_file || !output_file || !codes_file) {
+            printf("Error opening files\n");
             return 1;
         }
-        if (!codes_file) {
-            printf("Error: Cannot open codes file: %s\n", codes_filename);
-            fclose(encoded_file);
-            return 1;
-        }
-        if (!output_file) {
-            printf("Error: Cannot open output file: %s\n", output_filename);
-            fclose(encoded_file);
-            fclose(codes_file);
-            return 1;
-        }
-
-        //Читаю таблицу кодов
+        
+        printf("=== DECODING ===\n");
+        
+        // 1. Чтение кодов из файла
         char codes[256][256] = {0};
         char line[256];
         
         while (fgets(line, sizeof(line), codes_file)) {
-            line[strcspn(line, "\r\n")] = '\0';
-            
+            line[strcspn(line, "\n")] = 0;
             char* colon = strchr(line, ':');
             if (colon) {
-                *colon = '\0';
-                char* code_str = colon + 1;
-                
+                *colon = 0;
                 int symbol = atoi(line);
-                strcpy(codes[symbol], code_str);
+                strcpy(codes[symbol], colon + 1);
             }
         }
-        fclose(codes_file);
-
-        printf("Decoding data...\n");
-        char buffer[256] = {0};
-        int buf_pos = 0;
-        int bit;
         
-        while ((bit = fgetc(encoded_file)) != EOF) {
-            if (bit == '0' || bit == '1') {
-                buffer[buf_pos++] = (char)bit;
-                buffer[buf_pos] = '\0';
-                
-                // Ищем этот код в таблице
-                for (int i = 0; i < 256; i++) {
-                    if (strlen(codes[i]) > 0 && strcmp(buffer, codes[i]) == 0) {
-                        fputc(i, output_file);  // Записываем символ
-                        buf_pos = 0;
-                        buffer[0] = '\0';
-                        break;
+        // 2. Восстановление дерева из кодов
+        Node* root = createLeafNode(0, 0);
+        
+        for (int i = 0; i < 256; i++) {
+            if (strlen(codes[i]) > 0) {
+                Node* currentNode = root;
+                for (int j = 0; codes[i][j] != '\0'; j++) {
+                    if (codes[i][j] == '0') {
+                        if (!currentNode->left) {
+                            currentNode->left = createLeafNode(0, 0);
+                        }
+                        currentNode = currentNode->left;
+                    } else {
+                        if (!currentNode->right) {
+                            currentNode->right = createLeafNode(0, 0);
+                        }
+                        currentNode = currentNode->right;
                     }
                 }
-                
-                // Защита от ошибок
-                if (buf_pos >= 255) {
-                    printf("Error: Code too long or corrupted data!\n");
-                    break;
-                }
+                currentNode->symbol = i;
             }
         }
         
-        printf("\nDecoding complete!\n");
-        printf("Output file: %s\n", output_filename);
-        printf("\n=== VERIFICATION ===\n");
-
-        // Переоткрываем output_file для чтения
-        fclose(output_file);
-        output_file = fopen(output_filename, "r");
-
-        // Открываем оригинальный файл если он был передан
-        if (argc >= 6) {
-            char* original_filename = argv[5];
-            FILE *original_file = fopen(original_filename, "r");
-            
-            if (original_file && output_file) {
-                if (compareFiles(original_file, output_file)) {
-                    printf("SUCCESS: Decoded file matches original!\n");
-                } else {
-                    printf("FAILURE: Decoded file differs from original!\n");
-                }
-                fclose(original_file);
-            }
-        }
-
+        // 3. Декодирование с побитовой арифметикой
+        printf("Decoding with bit arithmetic...\n");
+        //decodeFileBit(input_file, output_file, root);
         
-        fclose(encoded_file);
+        printf("Decoding complete!\n");
+        
+        // Очистка
+        fclose(input_file);
         fclose(output_file);
+        fclose(codes_file);
+        freeTree(root);
+        
     } else {
         printf("Unknown mode: %s\n", mode);
-        printf("Use -e for encode or -d for decode\n");
         return 1;
     }
     
     return 0;
 }
-
-// ./huffman -e input.txt output.huff codes.txt
-// ./huffman -d output.huff codes.txt decode.huff input.txt
-//gcc -o huffman tree.c node_leaf.c min-heap.c freq.c codes.c
