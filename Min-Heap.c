@@ -29,10 +29,12 @@ Node** createNodeArray(unsigned int* freq, int* count){
 void buildMinHeap(Node** nodes, int count){
     for (int i = 0; i < count-1; i++){
         for (int j = i + 1; j < count; j++){
-            if (nodes[j]->freq < nodes[i]->freq){
-                Node* temp = nodes[i];
-                nodes[i] = nodes[j];
-                nodes[j] = temp;
+            if (nodes[j]->freq < nodes[i]->freq ||
+                (nodes[j]->freq == nodes[i]->freq && 
+                 nodes[j]->symbol < nodes[i]->symbol)) {
+                    Node* temp = nodes[i];
+                    nodes[i] = nodes[j];
+                    nodes[j] = temp;
             }
         }
     }

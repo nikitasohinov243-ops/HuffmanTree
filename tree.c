@@ -3,8 +3,8 @@
 
 // /Users/nikitasohinov/Documents/ВШЭ/Лабы/programirovanie.2/labs/HuffmanTree
 // ./huffman -e input.txt output.bin codes.txt
-// ./huffman -d 
-// gcc -o huffman tree.c node_leaf.c min-heap.c freq.c codes.c bit_work.c
+// ./huffman -d output.bin output_decode.txt codes.txt
+// gcc -o huffman tree.c node_leaf.c min-heap.c freq.c codes.c bit_work.c rebuild_tree.c
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
@@ -59,11 +59,15 @@ int main(int argc, char *argv[]) {
         char codes[256][256] = {0};
         char currentCode[256] = {0};
         generateCodes(root, currentCode, 0, codes);
-        
-        // 5. Сохранение кодов в файл
+
+        fprintf(codes_file, "FREQUENCIES:\n");
         for (int i = 0; i < 256; i++) {
-            if (strlen(codes[i]) > 0) {
-                fprintf(codes_file, "%d:%s\n", i, codes[i]);
+            if (freq[i] > 0) {
+                if (i >= 32 && i <= 126) { // Печатные символы
+                    fprintf(codes_file, "%c: %u\n", (char)i, freq[i]);
+                } else { // Непечатные символы
+                    fprintf(codes_file, "0x%02X: %u\n", i, freq[i]);
+                }
             }
         }
         
@@ -99,51 +103,44 @@ int main(int argc, char *argv[]) {
         }
         
         printf("=== DECODING ===\n");
+
+        unsigned int freq[256] = {0};
         
-        // 1. Чтение кодов из файла
-        char codes[256][256] = {0};
-        char line[256];
+        // Читаем файл построчно
+        char line[100];
         
+        // Пропускаем строку "FREQUENCIES:"
+        fgets(line, sizeof(line), codes_file);
+        
+        // Читаем частоты пока не встретим пустую строку
         while (fgets(line, sizeof(line), codes_file)) {
-            line[strcspn(line, "\n")] = 0;
-            char* colon = strchr(line, ':');
-            if (colon) {
-                *colon = 0;
-                int symbol = atoi(line);
-                strcpy(codes[symbol], colon + 1);
+            // Убираем \n
+            line[strcspn(line, "\n")] = '\0';
+            
+            // Если пустая строка - заканчиваем
+            if (strlen(line) == 0) {
+                break;
+            }
+            
+            // Парсим: "символ: частота"
+            char symbol_part[10];
+            unsigned int frequency;
+            
+            if (sscanf(line, "%s %u", symbol_part, &frequency) == 2) {
+                // symbol_part будет "X:" (например "A:"), убираем двоеточие
+                char symbol = symbol_part[0];
+                freq[(int)symbol] = frequency;
             }
         }
         
-        // 2. Восстановление дерева из кодов
-        Node* root = createLeafNode(0, 0);
+        Node* root = rebuildTreeFromFreq(freq);
         
-        for (int i = 0; i < 256; i++) {
-            if (strlen(codes[i]) > 0) {
-                Node* currentNode = root;
-                for (int j = 0; codes[i][j] != '\0'; j++) {
-                    if (codes[i][j] == '0') {
-                        if (!currentNode->left) {
-                            currentNode->left = createLeafNode(0, 0);
-                        }
-                        currentNode = currentNode->left;
-                    } else {
-                        if (!currentNode->right) {
-                            currentNode->right = createLeafNode(0, 0);
-                        }
-                        currentNode = currentNode->right;
-                    }
-                }
-                currentNode->symbol = i;
-            }
-        }
-        
-        // 3. Декодирование с побитовой арифметикой
-        printf("Decoding with bit arithmetic...\n");
-        //decodeFileBit(input_file, output_file, root);
+        // Декодирование
+        fseek(input_file, 0, SEEK_SET);
+        decodeFileBit(input_file, output_file, root);
         
         printf("Decoding complete!\n");
         
-        // Очистка
         fclose(input_file);
         fclose(output_file);
         fclose(codes_file);
@@ -153,6 +150,4 @@ int main(int argc, char *argv[]) {
         printf("Unknown mode: %s\n", mode);
         return 1;
     }
-    
-    return 0;
 }

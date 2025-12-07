@@ -16,11 +16,10 @@ void countFrequencies(FILE*, unsigned int*);
 void generateCodes(Node*, char*, int, char codes[256][256]);
 void freeTree(Node*);
 int compareFiles(FILE *, FILE *);
+Node* rebuildTreeFromFreq(unsigned int freq[256]);
 
-// Простые функции для битовой работы
-//void writeBits(FILE* , const char*;
 void encodeFileBit(FILE*, FILE*, char codes[256][256]);
-//void decodeFileBit(FILE*, FILE* Node*);
+void decodeFileBit(FILE*, FILE*, Node*);
 
 //Min-heap
 Node** createNodeArray(unsigned int*, int*);

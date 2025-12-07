@@ -1,27 +1,29 @@
 #include "codeproc.h"
+
 void encodeFileBit(FILE* input, FILE* output, char codes[256][256]) {
-    unsigned char buffer = 0;  // Буфер для накопления битов
-    int bitPos = 0;            // Текущая позиция в байте (0-7)
-    
+    // Сначала подсчитаем totalBits
     rewind(input);
+    long totalBits = 0;
     int ch;
-    
-    // Сначала записываем количество полезных битов (будем записать в конце)
-    long startPos = ftell(output);
-    fwrite(&bitPos, sizeof(int), 1, output); // Заглушка, заполним позже
-    
+    while ((ch = fgetc(input)) != EOF) {
+        totalBits += strlen(codes[ch]);
+    }
+
+    // Записываем totalBits в начало (8 байт)
+    fwrite(&totalBits, sizeof(long), 1, output);
+
+    // Теперь кодируем
+    rewind(input);
+    unsigned char buffer = 0;
+    int bitPos = 0;
+
     while ((ch = fgetc(input)) != EOF) {
         const char* bits = codes[ch];
-        
-        for (int i = 0; bits[i] != '\0'; i++) {
-            // Добавляем бит в буфер
+        for (int i = 0; bits[i]; i++) {
             if (bits[i] == '1') {
                 buffer |= (1 << (7 - bitPos));
             }
-            
             bitPos++;
-            
-            // Если байт заполнился, записываем его
             if (bitPos == 8) {
                 fputc(buffer, output);
                 buffer = 0;
@@ -29,17 +31,37 @@ void encodeFileBit(FILE* input, FILE* output, char codes[256][256]) {
             }
         }
     }
-    
-    // Если остались биты в буфере, записываем последний байт
+
     if (bitPos > 0) {
         fputc(buffer, output);
     }
-    
-    // Записываем реальное количество битов в последнем байте
-    long endPos = ftell(output);
-    fseek(output, startPos, SEEK_SET);
-    fwrite(&bitPos, sizeof(int), 1, output);
-    fseek(output, endPos, SEEK_SET);
-    
-    printf("Encoded with bit arithmetic. Last byte has %d useful bits\n", bitPos);
+
+    printf("Encoded. Total bits: %ld\n", totalBits);
+}
+
+void decodeFileBit(FILE* input, FILE* output, Node* root) {
+    long totalBits;
+    fread(&totalBits, sizeof(long), 1, input);
+
+    if (totalBits == 0) return;
+
+    Node* current = root;
+    unsigned char byte;
+    long bitsProcessed = 0;
+
+    while (bitsProcessed < totalBits && fread(&byte, 1, 1, input) == 1) {
+        for (int i = 7; i >= 0 && bitsProcessed < totalBits; i--) {
+            int bit = (byte >> i) & 1;
+            bitsProcessed++;
+
+            current = bit ? current->right : current->left;
+
+            if (!current->left && !current->right) {
+                fputc(current->symbol, output);
+                current = root;
+            }
+        }
+    }
+
+    printf("Decoded %ld bits\n", bitsProcessed);
 }
