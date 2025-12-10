@@ -45,16 +45,20 @@ void decodeFileBit(FILE* input, FILE* output, Node* root) {
 
     if (totalBits == 0) return;
 
-    Node* current = root;
-    unsigned char byte;
+    Node* current = root;//позиция в дереве. Начну с корня
+    unsigned char byte;//буффер для чтения одного байта с файла
     long bitsProcessed = 0;
 
-    while (bitsProcessed < totalBits && fread(&byte, 1, 1, input) == 1) {
-        for (int i = 7; i >= 0 && bitsProcessed < totalBits; i--) {
-            int bit = (byte >> i) & 1;
+    while (bitsProcessed < totalBits && fread(&byte, 1, 1, input) == 1) { //пока проверенных битов меньше общего количество битов И можно прочесть один лемент размером один байт
+        for (int i = 7; i >= 0 && bitsProcessed < totalBits; i--) { //читаем биты
+            int bit = (byte >> i) & 1;//оставляем только последний бит
             bitsProcessed++;
 
-            current = bit ? current->right : current->left;
+            if (bit == 1) {
+                current = current->right;
+            } else {
+                current = current->left;
+            }
 
             if (!current->left && !current->right) {
                 fputc(current->symbol, output);

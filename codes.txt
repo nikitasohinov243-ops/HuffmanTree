@@ -1,5 +1,6 @@
 FREQUENCIES:
 A: 4
 B: 3
-C: 7
-D: 1
+D: 6
+I: 4
+M: 2
